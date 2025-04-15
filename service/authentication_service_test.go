@@ -13,6 +13,7 @@ import (
 	"github.com/yukimaterrace/todoms/config"
 	"github.com/yukimaterrace/todoms/model"
 	"github.com/yukimaterrace/todoms/service"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -24,7 +25,8 @@ func TestAuthenticate(t *testing.T) {
 		15*time.Minute,
 		24*time.Hour,
 	)
-	authService := service.NewJWTAuthService(userRepo, authConfig)
+	testLogger := zap.NewNop() // テスト用にログを出力しないロガーを使用
+	authService := service.NewJWTAuthService(userRepo, authConfig, testLogger)
 	ctx := context.Background()
 
 	// Hash a password for our mock user
@@ -96,7 +98,8 @@ func TestValidateToken(t *testing.T) {
 		15*time.Minute,
 		24*time.Hour,
 	)
-	authService := service.NewJWTAuthService(userRepo, authConfig)
+	testLogger := zap.NewNop() // テスト用にログを出力しないロガーを使用
+	authService := service.NewJWTAuthService(userRepo, authConfig, testLogger)
 	ctx := context.Background()
 
 	// Create a user for our test
@@ -194,7 +197,8 @@ func TestRefreshToken(t *testing.T) {
 		15*time.Minute,
 		24*time.Hour,
 	)
-	authService := service.NewJWTAuthService(userRepo, authConfig)
+	testLogger := zap.NewNop() // テスト用にログを出力しないロガーを使用
+	authService := service.NewJWTAuthService(userRepo, authConfig, testLogger)
 	ctx := context.Background()
 
 	userID := uuid.New()

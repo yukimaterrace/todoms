@@ -9,6 +9,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/yukimaterrace/todoms/config"
 	"github.com/yukimaterrace/todoms/repository"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -63,16 +64,19 @@ type Claims struct {
 type JWTAuthService struct {
 	userRepo   repository.UserRepository
 	authConfig *config.AuthConfig
+	logger     *zap.Logger
 }
 
 // NewJWTAuthService creates a new JWT authentication service
 func NewJWTAuthService(
 	userRepo repository.UserRepository,
 	authConfig *config.AuthConfig,
+	logger *zap.Logger,
 ) AuthenticationService {
 	return &JWTAuthService{
 		userRepo:   userRepo,
 		authConfig: authConfig,
+		logger:     logger,
 	}
 }
 
@@ -81,21 +85,33 @@ func (s *JWTAuthService) Authenticate(ctx context.Context, email, password strin
 	// Get user by email
 	user, err := s.userRepo.GetByEmail(ctx, email)
 	if err != nil {
+		s.logger.Error("failed to get user by email",
+			zap.String("email", email),
+			zap.Error(err))
 		return nil, ErrUserNotFound
 	}
 
 	// Compare password with stored hash
 	err = bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(password))
 	if err != nil {
+		s.logger.Warn("invalid credentials attempt",
+			zap.String("email", email),
+			zap.Error(err))
 		return nil, ErrInvalidCredentials
 	}
 
 	// Generate token pair
 	tokenPair, err := s.generateTokenPair(user.ID.String(), user.Email)
 	if err != nil {
+		s.logger.Error("failed to generate token pair",
+			zap.String("user_id", user.ID.String()),
+			zap.Error(err))
 		return nil, err
 	}
 
+	s.logger.Info("user authenticated successfully",
+		zap.String("email", email),
+		zap.String("user_id", user.ID.String()))
 	return tokenPair, nil
 }
 
@@ -104,15 +120,24 @@ func (s *JWTAuthService) generateTokenPair(userID, email string) (*TokenPair, er
 	// Create access token
 	accessToken, err := s.generateToken(userID, email, AccessToken, s.authConfig.AccessTokenExpiry)
 	if err != nil {
+		s.logger.Error("failed to generate access token",
+			zap.String("user_id", userID),
+			zap.Error(err))
 		return nil, err
 	}
 
 	// Create refresh token
 	refreshToken, err := s.generateToken(userID, email, RefreshToken, s.authConfig.RefreshTokenExpiry)
 	if err != nil {
+		s.logger.Error("failed to generate refresh token",
+			zap.String("user_id", userID),
+			zap.Error(err))
 		return nil, err
 	}
 
+	s.logger.Debug("token pair generated",
+		zap.String("user_id", userID),
+		zap.String("token_type", "pair"))
 	return &TokenPair{
 		AccessToken:  accessToken,
 		RefreshToken: refreshToken,
@@ -137,9 +162,17 @@ func (s *JWTAuthService) generateToken(userID, email string, tokenType TokenType
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenString, err := token.SignedString([]byte(s.authConfig.JWTSecret))
 	if err != nil {
+		s.logger.Error("failed to sign JWT token",
+			zap.String("user_id", userID),
+			zap.String("token_type", string(tokenType)),
+			zap.Error(err))
 		return "", ErrJWTTokenCreation
 	}
 
+	s.logger.Debug("token generated",
+		zap.String("user_id", userID),
+		zap.String("token_type", string(tokenType)),
+		zap.Duration("expiry", expiry))
 	return tokenString, nil
 }
 
@@ -150,6 +183,8 @@ func (s *JWTAuthService) ValidateToken(tokenString string) (*Claims, error) {
 	token, err := jwt.ParseWithClaims(tokenString, claims, func(token *jwt.Token) (interface{}, error) {
 		// Validate signing method
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			s.logger.Warn("unexpected signing method",
+				zap.String("method", fmt.Sprintf("%v", token.Header["alg"])))
 			return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 		}
 		return []byte(s.authConfig.JWTSecret), nil
@@ -158,15 +193,26 @@ func (s *JWTAuthService) ValidateToken(tokenString string) (*Claims, error) {
 	if err != nil {
 		// Check if token is expired
 		if errors.Is(err, jwt.ErrTokenExpired) {
+			s.logger.Info("token has expired",
+				zap.String("user_id", claims.UserID),
+				zap.String("token_type", claims.Type))
 			return nil, ErrExpiredToken
 		}
+		s.logger.Warn("invalid token",
+			zap.Error(err))
 		return nil, err
 	}
 
 	if !token.Valid {
+		s.logger.Warn("token validation failed",
+			zap.String("user_id", claims.UserID),
+			zap.String("token_type", claims.Type))
 		return nil, ErrInvalidToken
 	}
 
+	s.logger.Debug("token validated successfully",
+		zap.String("user_id", claims.UserID),
+		zap.String("token_type", claims.Type))
 	return claims, nil
 }
 
@@ -175,25 +221,41 @@ func (s *JWTAuthService) RefreshToken(ctx context.Context, refreshToken string) 
 	// Validate the refresh token
 	claims, err := s.ValidateToken(refreshToken)
 	if err != nil {
+		s.logger.Error("refresh token validation failed",
+			zap.Error(err))
 		return nil, err
 	}
 
 	// Ensure it's a refresh token
 	if claims.Type != string(RefreshToken) {
+		s.logger.Warn("invalid token type for refresh",
+			zap.String("user_id", claims.UserID),
+			zap.String("expected", string(RefreshToken)),
+			zap.String("actual", claims.Type))
 		return nil, ErrInvalidTokenType
 	}
 
 	// Verify the user still exists
 	user, err := s.userRepo.GetByEmail(ctx, claims.Email)
 	if err != nil {
+		s.logger.Error("user not found during token refresh",
+			zap.String("email", claims.Email),
+			zap.String("user_id", claims.UserID),
+			zap.Error(err))
 		return nil, ErrUserNotFound
 	}
 
 	// Generate a new token pair
 	tokenPair, err := s.generateTokenPair(user.ID.String(), user.Email)
 	if err != nil {
+		s.logger.Error("failed to generate new token pair during refresh",
+			zap.String("user_id", claims.UserID),
+			zap.Error(err))
 		return nil, err
 	}
 
+	s.logger.Info("token refreshed successfully",
+		zap.String("user_id", claims.UserID),
+		zap.String("email", claims.Email))
 	return tokenPair, nil
 }
