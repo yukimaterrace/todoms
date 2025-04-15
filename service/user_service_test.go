@@ -10,10 +10,14 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/yukimaterrace/todoms/model"
 	"github.com/yukimaterrace/todoms/service"
+	"go.uber.org/zap"
 	"golang.org/x/crypto/bcrypt"
 )
 
 func TestCreateUser(t *testing.T) {
+	// Create a test logger
+	logger := zap.NewNop()
+
 	// Test cases
 	testCases := []struct {
 		name          string
@@ -75,7 +79,7 @@ func TestCreateUser(t *testing.T) {
 			mockRepo := new(MockUserRepository)
 			tc.setupMock(mockRepo)
 
-			userService := service.NewUserService(mockRepo)
+			userService := service.NewUserService(mockRepo, logger)
 
 			// Execute
 			user, err := userService.CreateUser(context.Background(), tc.email, tc.password)

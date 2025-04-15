@@ -4,6 +4,15 @@ import (
 	"time"
 )
 
+// Default token expiry durations
+const (
+	// DefaultAccessTokenExpiry is the default duration for access tokens (15 minutes)
+	DefaultAccessTokenExpiry = 15 * time.Minute
+
+	// DefaultRefreshTokenExpiry is the default duration for refresh tokens (7 days)
+	DefaultRefreshTokenExpiry = 7 * 24 * time.Hour
+)
+
 // AuthConfig holds authentication related configuration
 type AuthConfig struct {
 	// JWTSecret is the secret key used to sign JWT tokens
@@ -29,7 +38,7 @@ func NewAuthConfig(jwtSecret string, accessTokenExpiry, refreshTokenExpiry time.
 func DefaultAuthConfig() *AuthConfig {
 	return &AuthConfig{
 		JWTSecret:          "default-secret-key-change-in-production",
-		AccessTokenExpiry:  15 * time.Minute,   // Short-lived access tokens
-		RefreshTokenExpiry: 7 * 24 * time.Hour, // 7 days for refresh tokens
+		AccessTokenExpiry:  DefaultAccessTokenExpiry,
+		RefreshTokenExpiry: DefaultRefreshTokenExpiry,
 	}
 }
