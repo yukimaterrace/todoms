@@ -116,14 +116,15 @@ func TestValidateToken(t *testing.T) {
 	// as bcrypt comparison will fail
 	if err == service.ErrInvalidCredentials {
 		// Manually generate token for testing
+		now := time.Now()
 		claims := &service.Claims{
 			UserID: userID.String(),
 			Email:  "test@example.com",
 			Type:   string(service.AccessToken),
 			RegisteredClaims: jwt.RegisteredClaims{
-				ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
-				IssuedAt:  jwt.NewNumericDate(time.Now()),
-				NotBefore: jwt.NewNumericDate(time.Now()),
+				ExpiresAt: jwt.NewNumericDate(now.Add(15 * time.Minute)),
+				IssuedAt:  jwt.NewNumericDate(now),
+				NotBefore: jwt.NewNumericDate(now),
 			},
 		}
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
@@ -160,14 +161,15 @@ func TestValidateToken(t *testing.T) {
 
 	t.Run("expired token", func(t *testing.T) {
 		// Create an expired token
+		now := time.Now()
 		expiredClaims := &service.Claims{
 			UserID: userID.String(),
 			Email:  "test@example.com",
 			Type:   string(service.AccessToken),
 			RegisteredClaims: jwt.RegisteredClaims{
-				ExpiresAt: jwt.NewNumericDate(time.Now().Add(-1 * time.Hour)), // Expired
-				IssuedAt:  jwt.NewNumericDate(time.Now().Add(-2 * time.Hour)),
-				NotBefore: jwt.NewNumericDate(time.Now().Add(-2 * time.Hour)),
+				ExpiresAt: jwt.NewNumericDate(now.Add(-1 * time.Hour)), // Expired
+				IssuedAt:  jwt.NewNumericDate(now.Add(-2 * time.Hour)),
+				NotBefore: jwt.NewNumericDate(now.Add(-2 * time.Hour)),
 			},
 		}
 		token := jwt.NewWithClaims(jwt.SigningMethodHS256, expiredClaims)
@@ -203,14 +205,15 @@ func TestRefreshToken(t *testing.T) {
 	}
 
 	// Create a refresh token for testing
+	now := time.Now()
 	refreshClaims := &service.Claims{
 		UserID: userID.String(),
 		Email:  "test@example.com",
 		Type:   string(service.RefreshToken),
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			NotBefore: jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(now.Add(24 * time.Hour)),
+			IssuedAt:  jwt.NewNumericDate(now),
+			NotBefore: jwt.NewNumericDate(now),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims)
@@ -223,9 +226,9 @@ func TestRefreshToken(t *testing.T) {
 		Email:  "test@example.com",
 		Type:   string(service.AccessToken),
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(15 * time.Minute)),
-			IssuedAt:  jwt.NewNumericDate(time.Now()),
-			NotBefore: jwt.NewNumericDate(time.Now()),
+			ExpiresAt: jwt.NewNumericDate(now.Add(15 * time.Minute)),
+			IssuedAt:  jwt.NewNumericDate(now),
+			NotBefore: jwt.NewNumericDate(now),
 		},
 	}
 	accessToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims).SignedString([]byte("test-secret-key"))
