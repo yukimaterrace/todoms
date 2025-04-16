@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -211,4 +212,181 @@ func TestNewAuthHandler(t *testing.T) {
 
 	assert.NotNil(t, handler)
 	assert.Equal(t, mockService, handler.authService)
+}
+
+func TestGetUserClaims(t *testing.T) {
+	// Test cases
+	tests := []struct {
+		name          string
+		setupContext  func(ctx echo.Context)
+		expectedError error
+		expectedUser  *service.Claims
+	}{
+		{
+			name: "Valid User Claims",
+			setupContext: func(ctx echo.Context) {
+				claims := &service.Claims{
+					UserID: "user123",
+					Email:  "test@example.com",
+					Type:   string(service.AccessToken),
+				}
+				ctx.Set("user", claims)
+			},
+			expectedError: nil,
+			expectedUser: &service.Claims{
+				UserID: "user123",
+				Email:  "test@example.com",
+				Type:   string(service.AccessToken),
+			},
+		},
+		{
+			name: "Missing User Claims",
+			setupContext: func(ctx echo.Context) {
+				// Don't set any user in the context
+			},
+			expectedError: ErrUserClaimsNotFound,
+			expectedUser:  nil,
+		},
+		{
+			name: "Invalid User Claims Type",
+			setupContext: func(ctx echo.Context) {
+				// Set something that's not a Claims type
+				ctx.Set("user", "invalid-claims-type")
+			},
+			expectedError: ErrUserClaimsNotFound,
+			expectedUser:  nil,
+		},
+	}
+
+	// Run test cases
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Setup Echo
+			e := echo.New()
+
+			// Create auth handler
+			mockService := new(MockAuthenticationService)
+			authHandler := NewAuthHandler(mockService)
+
+			// Create test request and response
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+
+			// Setup context according to test case
+			tc.setupContext(c)
+
+			// Call the method being tested
+			claims, err := authHandler.GetUserClaims(c)
+
+			// Check results
+			if tc.expectedError != nil {
+				assert.Error(t, err)
+				assert.Equal(t, tc.expectedError, err)
+				assert.Nil(t, claims)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, claims)
+				assert.Equal(t, tc.expectedUser.UserID, claims.UserID)
+				assert.Equal(t, tc.expectedUser.Email, claims.Email)
+				assert.Equal(t, tc.expectedUser.Type, claims.Type)
+			}
+		})
+	}
+}
+
+func TestGetUserIDFromContextWithResponse(t *testing.T) {
+	// Test cases
+	tests := []struct {
+		name              string
+		setupContext      func(ctx echo.Context)
+		expectedUserID    string
+		expectedSuccess   bool
+		expectedCode      int
+		expectedErrorResp *model.ErrorResponse
+	}{
+		{
+			name: "Valid User ID",
+			setupContext: func(ctx echo.Context) {
+				claims := &service.Claims{
+					UserID: "6ba7b810-9dad-11d1-80b4-00c04fd430c8", // Valid UUID
+					Email:  "test@example.com",
+					Type:   string(service.AccessToken),
+				}
+				ctx.Set("user", claims)
+			},
+			expectedUserID:  "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+			expectedSuccess: true,
+		},
+		{
+			name: "Missing User Claims",
+			setupContext: func(ctx echo.Context) {
+				// Don't set any user in the context
+			},
+			expectedSuccess:   false,
+			expectedCode:      http.StatusInternalServerError,
+			expectedErrorResp: model.FailedToGetUserClaimsResponse,
+		},
+		{
+			name: "Invalid User ID Format",
+			setupContext: func(ctx echo.Context) {
+				claims := &service.Claims{
+					UserID: "invalid-uuid-format",
+					Email:  "test@example.com",
+					Type:   string(service.AccessToken),
+				}
+				ctx.Set("user", claims)
+			},
+			expectedSuccess:   false,
+			expectedCode:      http.StatusInternalServerError,
+			expectedErrorResp: model.InvalidUserIDFormatResponse,
+		},
+	}
+
+	// Run test cases
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			// Setup Echo
+			e := echo.New()
+
+			// Create auth handler
+			mockService := new(MockAuthenticationService)
+			authHandler := NewAuthHandler(mockService)
+
+			// Create test request and response
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			rec := httptest.NewRecorder()
+			c := e.NewContext(req, rec)
+
+			// Setup context according to test case
+			tc.setupContext(c)
+
+			// Call the method being tested
+			userID, success := authHandler.GetUserIDFromContextWithResponse(c)
+
+			// Check results
+			assert.Equal(t, tc.expectedSuccess, success)
+
+			if tc.expectedSuccess {
+				// Should have a valid UUID returned
+				assert.Equal(t, tc.expectedUserID, userID.String())
+				assert.Empty(t, rec.Body.String()) // No response body should be written
+			} else {
+				// Should have appropriate error response
+				assert.Equal(t, uuid.Nil, userID) // Should be nil UUID
+
+				// Check the response
+				assert.Equal(t, tc.expectedCode, rec.Code)
+
+				// Parse the error response
+				var errorResponse model.ErrorResponse
+				err := json.Unmarshal(rec.Body.Bytes(), &errorResponse)
+				assert.NoError(t, err)
+
+				// Verify the error response matches the expected one
+				assert.Equal(t, tc.expectedErrorResp.Code, errorResponse.Code)
+				assert.Equal(t, tc.expectedErrorResp.Message, errorResponse.Message)
+			}
+		})
+	}
 }
