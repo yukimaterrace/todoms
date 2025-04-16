@@ -28,6 +28,7 @@ func main() {
 
 	// Initialize repositories
 	userRepo := repository.NewUserRepository(db)
+	todoRepo := repository.NewTodoRepository(db)
 
 	// Initialize services
 	authConfig := &config.AuthConfig{
@@ -37,9 +38,10 @@ func main() {
 	}
 	userService := service.NewUserService(userRepo, logger)
 	authService := service.NewJWTAuthService(userRepo, authConfig, logger)
+	todoService := service.NewTodoService(todoRepo, logger)
 
 	// Setup Echo using controller package
-	e := controller.SetupEcho(userService, authService)
+	e := controller.SetupEcho(userService, authService, todoService)
 
 	// Start server
 	port := repository.GetEnvOrDefault("PORT", "8080")
