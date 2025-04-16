@@ -1,4 +1,4 @@
-.PHONY: migrate-up migrate-down run
+.PHONY: migrate-up migrate-down run test test-verbose test-coverage
 
 # Define variables
 DB_URL=postgres://admin:admin@localhost:5432/todoms?sslmode=disable
@@ -24,3 +24,19 @@ migrate-down:
 run:
 	@echo "Starting the application..."
 	go run main.go
+
+# Run tests
+test:
+	@echo "Running tests..."
+	go test -v ./...
+
+# Run tests with verbose output
+test-verbose:
+	@echo "Running tests with verbose output..."
+	go test -v -count=1 ./...
+
+# Run tests with coverage report
+test-coverage:
+	@echo "Running tests with coverage report..."
+	go test -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out
