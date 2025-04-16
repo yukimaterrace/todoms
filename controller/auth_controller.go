@@ -30,20 +30,15 @@ func (c *AuthController) RegisterRoutes(e *echo.Echo) {
 	auth := e.Group("/api/auth")
 	auth.POST("/signup", c.SignUp)
 	auth.POST("/login", c.Login)
+	auth.POST("/refresh", c.Refresh)
 	auth.GET("/me", c.Me, c.authHandler.RequireAuth)
 }
 
 // SignUp handles user registration
 func (c *AuthController) SignUp(ctx echo.Context) error {
 	req := new(model.SignUpRequest)
-	if err := ctx.Bind(req); err != nil {
-		return ctx.JSON(http.StatusBadRequest, model.InvalidRequestBodyResponse)
-	}
-
-	if err := ctx.Validate(req); err != nil {
-		validationErr := model.ValidationFailedResponse
-		validationErr.Message = err.Error()
-		return ctx.JSON(http.StatusBadRequest, validationErr)
+	if err := ValidateRequest(ctx, req); err != nil {
+		return err // Error response already sent by ValidateRequest
 	}
 
 	user, err := c.userService.CreateUser(ctx.Request().Context(), req.Email, req.Password)
@@ -63,14 +58,8 @@ func (c *AuthController) SignUp(ctx echo.Context) error {
 // Login handles user authentication and returns JWT tokens
 func (c *AuthController) Login(ctx echo.Context) error {
 	req := new(model.LoginRequest)
-	if err := ctx.Bind(req); err != nil {
-		return ctx.JSON(http.StatusBadRequest, model.InvalidRequestBodyResponse)
-	}
-
-	if err := ctx.Validate(req); err != nil {
-		validationErr := model.ValidationFailedResponse
-		validationErr.Message = err.Error()
-		return ctx.JSON(http.StatusBadRequest, validationErr)
+	if err := ValidateRequest(ctx, req); err != nil {
+		return err // Error response already sent by ValidateRequest
 	}
 
 	tokenPair, err := c.authService.Authenticate(ctx.Request().Context(), req.Email, req.Password)
@@ -86,10 +75,34 @@ func (c *AuthController) Login(ctx echo.Context) error {
 	return ctx.JSON(http.StatusOK, tokenPair)
 }
 
+// Refresh handles token refresh and returns a new token pair
+func (c *AuthController) Refresh(ctx echo.Context) error {
+	req := new(model.RefreshTokenRequest)
+	if err := ValidateRequest(ctx, req); err != nil {
+		return err // Error response already sent by ValidateRequest
+	}
+
+	tokenPair, err := c.authService.RefreshToken(ctx.Request().Context(), req.RefreshToken)
+	if err != nil {
+		switch err {
+		case service.ErrInvalidToken, service.ErrExpiredToken:
+			return ctx.JSON(http.StatusUnauthorized, model.InvalidTokenResponse)
+		case service.ErrInvalidTokenType:
+			return ctx.JSON(http.StatusUnauthorized, model.InvalidTokenTypeResponse)
+		case service.ErrUserNotFound:
+			return ctx.JSON(http.StatusUnauthorized, model.InvalidCredentialsResponse)
+		default:
+			return ctx.JSON(http.StatusInternalServerError, model.AuthenticationFailedResponse)
+		}
+	}
+
+	return ctx.JSON(http.StatusOK, tokenPair)
+}
+
 // Me returns information about the authenticated user
 func (c *AuthController) Me(ctx echo.Context) error {
-	claims, ok := ctx.Get("user").(*service.Claims)
-	if !ok {
+	claims, err := c.authHandler.GetUserClaims(ctx)
+	if err != nil {
 		return ctx.JSON(http.StatusInternalServerError, model.FailedToGetUserClaimsResponse)
 	}
 
