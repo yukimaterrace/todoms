@@ -27,8 +27,9 @@ func formatErrorCode(statusCode int, number int) string {
 // Auth error constants
 var (
 	// 400 Bad Request errors
-	InvalidRequestBodyResponse = NewErrorResponse(http.StatusBadRequest, 1, "Invalid request body")
-	ValidationFailedResponse   = NewErrorResponse(http.StatusBadRequest, 2, "Validation failed")
+	InvalidRequestBodyResponse  = NewErrorResponse(http.StatusBadRequest, 1, "Invalid request body")
+	ValidationFailedResponse    = NewErrorResponse(http.StatusBadRequest, 2, "Validation failed")
+	InvalidTodoIDFormatResponse = NewErrorResponse(http.StatusBadRequest, 10, "Invalid todo ID format")
 
 	// 401 Unauthorized errors
 	InvalidCredentialsResponse      = NewErrorResponse(http.StatusUnauthorized, 1, "Invalid email or password")
@@ -38,6 +39,12 @@ var (
 	InvalidTokenResponse            = NewErrorResponse(http.StatusUnauthorized, 5, "Invalid token")
 	InvalidTokenTypeResponse        = NewErrorResponse(http.StatusUnauthorized, 6, "Invalid token type")
 
+	// 403 Forbidden errors
+	NoPermissionToAccessTodoResponse = NewErrorResponse(http.StatusForbidden, 1, "You don't have permission to access this todo")
+
+	// 404 Not Found errors
+	TodoNotFoundResponse = NewErrorResponse(http.StatusNotFound, 1, "Todo not found")
+
 	// 409 Conflict errors
 	EmailAlreadyExistsResponse = NewErrorResponse(http.StatusConflict, 1, "Email already exists")
 
@@ -45,4 +52,6 @@ var (
 	FailedToCreateUserResponse    = NewErrorResponse(http.StatusInternalServerError, 1, "Failed to create user")
 	AuthenticationFailedResponse  = NewErrorResponse(http.StatusInternalServerError, 2, "Authentication failed")
 	FailedToGetUserClaimsResponse = NewErrorResponse(http.StatusInternalServerError, 3, "Failed to get user claims")
+	InvalidUserIDFormatResponse   = NewErrorResponse(http.StatusInternalServerError, 4, "Invalid user ID format")
+	FailedToOperateResponse       = NewErrorResponse(http.StatusInternalServerError, 10, "Failed to operate")
 )

@@ -12,6 +12,11 @@ type LoginRequest struct {
 	Password string `json:"password" validate:"required"`
 }
 
+// RefreshTokenRequest represents the request body for token refresh
+type RefreshTokenRequest struct {
+	RefreshToken string `json:"refresh_token" validate:"required"`
+}
+
 // UserResponse represents the response for user data
 type UserResponse struct {
 	ID    string `json:"id"`
