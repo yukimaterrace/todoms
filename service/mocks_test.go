@@ -43,3 +43,44 @@ func (m *MockUserRepository) Delete(ctx context.Context, id uuid.UUID) error {
 	args := m.Called(ctx, id)
 	return args.Error(0)
 }
+
+// MockTodoRepository is a mock implementation of TodoRepository
+type MockTodoRepository struct {
+	mock.Mock
+}
+
+func (m *MockTodoRepository) Create(ctx context.Context, todo *model.Todo) error {
+	args := m.Called(ctx, todo)
+	return args.Error(0)
+}
+
+func (m *MockTodoRepository) GetByID(ctx context.Context, id uuid.UUID) (*model.Todo, error) {
+	args := m.Called(ctx, id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*model.Todo), args.Error(1)
+}
+
+func (m *MockTodoRepository) GetByUserID(ctx context.Context, userID uuid.UUID) ([]model.Todo, error) {
+	args := m.Called(ctx, userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]model.Todo), args.Error(1)
+}
+
+func (m *MockTodoRepository) Update(ctx context.Context, todo *model.Todo) error {
+	args := m.Called(ctx, todo)
+	return args.Error(0)
+}
+
+func (m *MockTodoRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
+func (m *MockTodoRepository) MarkAsCompleted(ctx context.Context, id uuid.UUID) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}

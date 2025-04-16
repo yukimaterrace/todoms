@@ -8,7 +8,7 @@ import (
 )
 
 // SetupEcho initializes and configures Echo instance with given services
-func SetupEcho(userService service.UserService, authService service.AuthenticationService) *echo.Echo {
+func SetupEcho(userService service.UserService, authService service.AuthenticationService, todoService service.TodoService) *echo.Echo {
 	// Initialize Echo
 	e := echo.New()
 	e.Validator = NewValidator()
@@ -23,9 +23,11 @@ func SetupEcho(userService service.UserService, authService service.Authenticati
 
 	// Initialize controllers
 	authController := NewAuthController(authService, userService, authHandler)
+	todoController := NewTodoController(todoService, authHandler)
 
 	// Register routes
 	authController.RegisterRoutes(e)
+	todoController.RegisterRoutes(e)
 
 	// Default route
 	e.GET("/", func(c echo.Context) error {
