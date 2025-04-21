@@ -79,6 +79,8 @@ todosは、Go言語で開発されたTODO管理システムです。ユーザー
 
 ## API仕様
 
+詳細なAPI仕様は[API_SPEC.md](API_SPEC.md)を参照してください。
+
 ### 認証エンドポイント
 
 - `POST /api/auth/signup` - 新規ユーザー登録
